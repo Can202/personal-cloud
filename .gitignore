@@ -1,0 +1,8 @@
+save/
+save/*
+__pycache__/
+__pycache__/*
+trash/*
+trash/
+curlcommand
+Database.db
