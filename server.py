@@ -3,6 +3,7 @@ import re
 import os
 import sqlite3 as db
 import database_conector as dbc
+import json
 
 class FileServer(BaseHTTPRequestHandler):
     
@@ -12,8 +13,57 @@ class FileServer(BaseHTTPRequestHandler):
             # Get url
             base_front = "static"
             url = str(self.path)
+            
+            if self.path.startswith('/drive'):
+                path = getPath("save/", self.path, "/drive", createDIR=False)
+                path = path[0:len(path)-1]
+                if os.path.isfile(path):
+                    name = os.path.basename(path)
+                    try:
+                        with open(path, 'rb') as file:
+                            file_contents = file.read()
+                    except FileNotFoundError:
+                        self.send_error(404, 'File Not Found')
+                        return
+                    self.send_response(200)
+                    self.send_header('Content-Disposition', 'attachment; filename="' + name + '"')
+                    self.send_header('Content-type', 'application/octet-stream')
+                    self.send_header('Content-length', str(len(file_contents)))
+                    self.end_headers()
+
+                    self.wfile.write(file_contents)
+                    return
+                elif os.path.isdir(path):
+                    file_list = os.listdir(path)
+                    # Create a JSON object or dictionary
+                    data = {
+                        "go_back": "..",
+                    }
+                    filen = 1
+                    dirn = 1
+                    for dfile in file_list:
+                        if os.path.isfile(os.path.join(path, dfile)):
+                            data["file" + str(filen)] = dfile
+                            filen += 1
+                        else:
+                            data["dir" + str(dirn)] = dfile
+                            dirn += 1
+                    
+                    # Convert the data to a JSON string
+                    json_data = json.dumps(data)
+
+                    # Set the response headers
+                    self.send_response(200)
+                    self.send_header('Content-type', 'application/json')
+                    self.end_headers()
+
+                    # Send the JSON data as the response
+                    self.wfile.write(json_data.encode())
+                    return
+
+            
             # check dir to replace it with index.html if exists
-            if os.path.isdir(base_front + url):
+            elif os.path.isdir(base_front + url):
                 if os.path.exists(base_front + url + "index.html"):
                     content_type = 'text/html'
                     url += "index.html"
@@ -64,10 +114,14 @@ class FileServer(BaseHTTPRequestHandler):
                     request_data = self.rfile.read(content_length)
                     # part of the data that has to be removed
                     start_index = request_data.find(b'\r\n\r\n') + 4
-                    # data without the prefix
-                    data = request_data[start_index:len(request_data)-1]
+                    #end_index = len(request_data) - 1
+                    end_index = len(request_data) - len(b'--------------------------1b0f8f562f0c2933--')
+                            
                     
-                    path = getPath("save/", self.path)
+                    # data without the prefix
+                    data = request_data[start_index:end_index]
+                    
+                    path = getPath("save/", self.path, "/upload")
                     name = name_of_file
                     
                     with open(path + name, 'wb') as file:
@@ -90,21 +144,22 @@ class FileServer(BaseHTTPRequestHandler):
     
 
 
-def getPath(prefix, url):
+def getPath(prefix, url, normal_access, createDIR=True):
     path = prefix
-    normal_access = "/upload"
-    file_path = ""
+    st = len(normal_access) + 1
+    file_path = prefix
     
     if url != normal_access and url != normal_access + "/":
-        if url.startswith("/upload/"):
-            url = url[8:len(url)]
+        if url.startswith(normal_access + "/"):
+            url = url[st:len(url)]
             url_split = url.split("/")
             for i in range(len(url_split)):
                 file_path = prefix
                 for j in range(i+1):
                     file_path += url_split[j] + "/"
-                if os.path.exists(file_path) == False:
-                    os.mkdir(file_path)
+                if os.path.exists(file_path) == False and os.path.exists(file_path[0:len(file_path)-1]) == False:
+                    if createDIR:
+                        os.mkdir(file_path)
     return file_path
 
 def good_IP(IP):
