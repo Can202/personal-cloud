@@ -1,8 +1,7 @@
-save/
-save/*
-__pycache__/
-__pycache__/*
-trash/*
-trash/
-curlcommand
-Database.db
+server/save/
+server/save/*
+server/__pycache__/
+server/__pycache__/*
+server/trash/*
+server/trash/
+server/Database.db
